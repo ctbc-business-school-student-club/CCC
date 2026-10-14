@@ -481,6 +481,7 @@ body {
 
 #qr-shaded-region {
   box-sizing: border-box !important;
+  border-width: 37px 37px !important;
 }
 
 .whitelist-header-btns {
