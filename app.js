@@ -109,7 +109,8 @@ async function handleLogin(e) {
   const alertBox = document.getElementById("loginAlert");
   const loginBtn = document.getElementById("loginBtn");
 
-  const email = emailInput.value.trim();
+  const rawEmail = (emailInput.value || "");
+  const email = rawEmail.replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
   if (!email) return;
 
   loginBtn.disabled = true;
@@ -767,8 +768,8 @@ function closeUserModal() {
 
 async function handleSaveUser(e) {
   e.preventDefault();
-  const origEmail = document.getElementById("editOriginalEmail").value;
-  const email = document.getElementById("modalEmail").value.trim();
+  const origEmail = (document.getElementById("editOriginalEmail").value || "").replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
+  const email = (document.getElementById("modalEmail").value || "").replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
   const name = document.getElementById("modalName").value.trim();
   const role = document.getElementById("modalRole").value;
 
