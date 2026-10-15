@@ -22,8 +22,7 @@ let statsTimer = null;        // 5 秒輪詢計時器
 const mockDb = {
   whitelist: [
     { email: "admin@concert.com", name: "活動總召 (管理者)", role: "管理者" },
-    { email: "staff@concert.com", name: "檢票小組 A (工作人員)", role: "檢票人員" },
-
+    { email: "staff@concert.com", name: "檢票小組 A (工作人員)", role: "檢票人員" }
   ],
   attendees: [
     { category: "校內", ticketType: "校內票", identifier: "學號：10954001 (財金四)", name: "陳大明", detail: "班級: 財金四", email: "student1@mail.edu.tw", phone: "0912345678", token: "TKN-CAMPUS001", status: "未入場", checkInTime: "-" },
@@ -70,15 +69,6 @@ function adaptResponsiveLayout() {
 }
 window.addEventListener("resize", adaptResponsiveLayout);
 
-// 螢幕旋轉時自動適配掃描器尺寸
-window.addEventListener("orientationchange", async () => {
-  adaptResponsiveLayout();
-  if (html5Qrcode && html5Qrcode.isScanning) {
-    await stopScanner();
-    setTimeout(initScanner, 300);
-  }
-});
-
 /**
  * 呼叫 Apps Script API
  * 使用 Content-Type: text/plain 可避免瀏覽器 CORS 預檢 (Apps Script 不支援 OPTIONS)
@@ -119,8 +109,7 @@ async function handleLogin(e) {
   const alertBox = document.getElementById("loginAlert");
   const loginBtn = document.getElementById("loginBtn");
 
-  const rawEmail = (emailInput.value || "");
-  const email = rawEmail.replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
+  const email = emailInput.value.trim();
   if (!email) return;
 
   loginBtn.disabled = true;
@@ -252,20 +241,9 @@ async function initScanner() {
       html5Qrcode = new Html5Qrcode("reader");
     }
 
-    // 動態計算正方形 QR CODE 掃描框，確保在任何手機螢幕比例與解析度下均為 1:1 正方形
-    const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      // 取短邊約 72%，限制在合理範圍內，確保不被截斷且為正方形
-      const qrboxSize = Math.max(160, Math.min(Math.floor(minEdge * 0.72), 260));
-      return {
-        width: qrboxSize,
-        height: qrboxSize
-      };
-    };
-
     await html5Qrcode.start(
       { facingMode: currentFacingMode },
-      { fps: 10, qrbox: qrboxFunction },
+      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
       onScanSuccess,
       onScanFailure
     );
@@ -751,17 +729,15 @@ async function loadWhitelist() {
   }
 
   tbody.innerHTML = res.data.map(user => `
-    <tr class="whitelist-row">
-      <td data-label="電子郵件" class="td-email" style="font-family: monospace;">${escapeHtml(user.email)}</td>
-      <td data-label="姓名" class="td-name" style="font-weight: 700;">${escapeHtml(user.name)}</td>
-      <td data-label="身分權限" class="td-role">
+    <tr>
+      <td style="font-family: monospace;">${escapeHtml(user.email)}</td>
+      <td style="font-weight: 700;">${escapeHtml(user.name)}</td>
+      <td>
         <span class="role-badge ${user.role === "管理者" ? "role-admin" : "role-staff"}">${escapeHtml(user.role)}</span>
       </td>
-      <td data-label="管理操作" class="td-action">
-        <div class="whitelist-actions">
-          <button onclick="openEditUserModal('${escapeHtml(escapeJs(user.email))}', '${escapeHtml(escapeJs(user.name))}', '${escapeHtml(escapeJs(user.role))}')" class="btn btn-secondary btn-sm">編輯</button>
-          <button onclick="handleDeleteUser('${escapeHtml(escapeJs(user.email))}')" class="btn btn-danger btn-sm">刪除</button>
-        </div>
+      <td>
+        <button onclick="openEditUserModal('${escapeHtml(escapeJs(user.email))}', '${escapeHtml(escapeJs(user.name))}', '${escapeHtml(escapeJs(user.role))}')" class="btn btn-secondary btn-sm" style="margin-right: 6px;">編輯</button>
+        <button onclick="handleDeleteUser('${escapeHtml(escapeJs(user.email))}')" class="btn btn-danger btn-sm">刪除</button>
       </td>
     </tr>
   `).join("");
@@ -791,8 +767,8 @@ function closeUserModal() {
 
 async function handleSaveUser(e) {
   e.preventDefault();
-  const origEmail = (document.getElementById("editOriginalEmail").value || "").replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
-  const email = (document.getElementById("modalEmail").value || "").replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
+  const origEmail = document.getElementById("editOriginalEmail").value;
+  const email = document.getElementById("modalEmail").value.trim();
   const name = document.getElementById("modalName").value.trim();
   const role = document.getElementById("modalRole").value;
 
