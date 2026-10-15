@@ -297,7 +297,7 @@
         <div
           style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px;">
           <h2 style="font-size: 1.25rem; font-weight: 700;">系統登入白名單管理 (CRUD)</h2>
-          <div class="whitelist-header-btns">
+          <div style="display: flex; gap: 10px;">
             <button onclick="triggerBackfillTokens()" class="btn btn-secondary btn-sm">
               ⚡ 補產生缺漏 Token 與 QR CODE 圖片
             </button>
@@ -355,7 +355,7 @@
 
         <div class="form-group">
           <label class="form-label" for="modalRole">身分別 (系統權限)</label>
-          <select id="modalRole" class="form-input">
+          <select id="modalRole" class="form-input" style="background: rgba(15, 23, 42, 0.9);">
             <option value="檢票人員">檢票人員 (驗票/查詢/看板)</option>
             <option value="管理者">管理者 (全權限 + CRUD + 補 Token)</option>
           </select>
