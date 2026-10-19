@@ -224,7 +224,7 @@
           <div class="stat-card">
             <div class="stat-label">總報名人數</div>
             <div id="statTotalRegistered" class="stat-value">0</div>
-            <div class="stat-desc">校內 + 校外累計</div>
+            <div class="stat-desc">依姓名欄位加總 (全票種累計)</div>
           </div>
 
           <div class="stat-card accent-green">
@@ -248,7 +248,7 @@
           </div>
         </div>
 
-        <!-- 校內 / 校外 細分與動態歷史紀錄 -->
+        <!-- 校內 / 校外 / 公關票 細分與動態歷史紀錄 -->
         <div class="charts-row">
           <div class="manual-entry-box">
             <div class="manual-title">
@@ -274,6 +274,17 @@
                 <div class="progress-bar-container">
                   <div id="offCampusProgressBar" class="progress-bar-fill"
                     style="width: 0%; background: var(--accent-pink);"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px;">
+                  <span>公關票</span>
+                  <span id="prStatCount">0 / 0 人</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div id="prProgressBar" class="progress-bar-fill"
+                    style="width: 0%; background: #f59e0b;"></div>
                 </div>
               </div>
             </div>
