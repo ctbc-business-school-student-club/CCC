@@ -466,6 +466,7 @@ body {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
+  aspect-ratio: 1 / 1;
   min-height: 280px;
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -474,12 +475,11 @@ body {
   position: relative;
 }
 
-/* 相機畫面保持原生真實比例，絕不拉伸變形，確保掃描框是完美正方形且座標不偏移 */
+/* 相機畫面保持 1:1 正方形且不拉伸變形，確保手機掃描框是標準正方形且座標不偏移 */
 #reader video {
   width: 100% !important;
-  height: auto !important;
-  max-height: 70vh;
-  object-fit: contain !important;
+  height: 100% !important;
+  object-fit: cover !important;
   display: block;
   margin: 0 auto;
 }
