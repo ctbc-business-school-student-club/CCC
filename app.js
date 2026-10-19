@@ -109,7 +109,10 @@ async function handleLogin(e) {
   const alertBox = document.getElementById("loginAlert");
   const loginBtn = document.getElementById("loginBtn");
 
-  const email = emailInput.value.trim();
+  const rawEmail = (emailInput.value || "");
+  const email = rawEmail.normalize("NFKC")
+    .replace(/[\s\u3000\u00A0\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]+/g, "")
+    .toLowerCase();
   if (!email) return;
 
   loginBtn.disabled = true;
@@ -243,7 +246,19 @@ async function initScanner() {
 
     await html5Qrcode.start(
       { facingMode: currentFacingMode },
-      { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+      {
+        fps: 15, // 提高幀率，使掃描反應更敏捷
+        // 動態計算完美正方形掃描框 (寬高嚴格相等)
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          // 取相機畫面短邊的 70%，限制在 180px ~ 280px 之間，確保是標準正方形
+          const edge = Math.max(180, Math.min(Math.floor(minEdge * 0.7), 280));
+          return { width: edge, height: edge };
+        },
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // 啟用手機原生硬體 BarcodeDetector 加速
+        }
+      },
       onScanSuccess,
       onScanFailure
     );
@@ -767,8 +782,8 @@ function closeUserModal() {
 
 async function handleSaveUser(e) {
   e.preventDefault();
-  const origEmail = document.getElementById("editOriginalEmail").value;
-  const email = document.getElementById("modalEmail").value.trim();
+  const origEmail = (document.getElementById("editOriginalEmail").value || "").replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
+  const email = (document.getElementById("modalEmail").value || "").replace(/[\u3000\u00A0\s]+/g, "").trim().toLowerCase();
   const name = document.getElementById("modalName").value.trim();
   const role = document.getElementById("modalRole").value;
 
