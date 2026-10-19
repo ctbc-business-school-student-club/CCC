@@ -464,12 +464,29 @@ body {
 
 #reader {
   width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
   min-height: 280px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: #000;
+  background: #0f172a;
   border: 2px solid #ffd1dc;
   position: relative;
+}
+
+/* 相機畫面保持原生真實比例，絕不拉伸變形，確保掃描框是完美正方形且座標不偏移 */
+#reader video {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 70vh;
+  object-fit: contain !important;
+  display: block;
+  margin: 0 auto;
+}
+
+/* 掃描框視覺優化 */
+#qr-shaded-region {
+  border-radius: 12px;
 }
 
 /* 全螢幕/卡片式掃描結果覆蓋層 */
@@ -1128,8 +1145,10 @@ details[open] .collapse-icon {
   }
 
   #reader {
-    min-height: 210px;
-    max-height: 38vh;
+    /* 手機版：全寬正方形掃描區，不再限制 38vh 高度（會導致畫面被裁切變小） */
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    max-height: 70vh;
     border-radius: 8px;
   }
 
@@ -1333,4 +1352,3 @@ details[open] .collapse-icon {
     display: none;
   }
 }
-
