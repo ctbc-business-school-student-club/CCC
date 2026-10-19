@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>2026CCC入場通關系統</title>
+  <meta name="description" content="演唱會工作人員專用：QR Code 驗票、觀眾查詢與即時入場統計">
+  <meta name="robots" content="noindex, nofollow">
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <!-- ==========================================
+   * 1. 登入視圖 (Login View)
+   * ========================================== -->
+  <div id="loginView" class="login-container">
+    <div class="login-card">
+      <div class="brand-badge">
+        <span>🎸</span> 2026CCC入場通關系統
+      </div>
+      <h1 class="login-title">系統人員登入</h1>
+      <p class="login-subtitle">請輸入活動白名單授權之電子郵件以繼續</p>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">電子郵件 (Email)</label>
+          <input type="email" id="loginEmail" class="form-input" placeholder="example@domain.com" required
+            autocomplete="email">
+        </div>
+        <button type="submit" id="loginBtn" class="btn btn-primary">
+          <span>確認登入</span> ➔
+        </button>
+      </form>
+
+      <div id="loginAlert" class="alert-box alert-danger"></div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+   * 2. 主應用程式視圖 (App Main View)
+   * ========================================== -->
+  <div id="appView" style="display: none;">
+    <!-- 頁首與使用者角色標籤 -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand-logo">
+          <div class="brand-icon">🎟️</div>
+          <span>2026CCC入場通關系統</span>
+        </div>
+        <div class="user-profile">
+          <div class="user-info">
+            <div id="currentUserName" class="user-name">載入中...</div>
+            <span id="currentUserRole" class="role-badge role-staff">檢票人員</span>
+          </div>
+          <button onclick="handleLogout()" class="btn btn-secondary btn-sm" title="登出系統">
+            🚪 登出
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 頁籤導覽列 (Nav Tabs) -->
+    <nav class="nav-tabs-bar">
+      <div class="nav-tabs-inner">
+        <button class="tab-btn active" onclick="switchTab('scanner')">
+          📷 相機驗票
+        </button>
+        <button class="tab-btn" onclick="switchTab('query')">
+          🔍 觀眾狀態查詢
+        </button>
+        <button class="tab-btn" onclick="switchTab('stats')">
+          📊 實時統計看板
+        </button>
+        <button id="whitelistTabBtn" class="tab-btn" onclick="switchTab('whitelist')" style="display: none;">
+          ⚙️ 登入白名單管理
+        </button>
+      </div>
+    </nav>
+
+    <!-- 主內容容器 -->
+    <main class="main-content">
+
+      <!-- ==========================================
+       * 頁籤 1: 鏡頭驗票 (Scanner Tab)
+       * ========================================== -->
+      <section id="tab-scanner" class="tab-pane active">
+        <div class="scanner-layout">
+          <!-- 掃描相機卡片 -->
+          <div class="scanner-card">
+            <div class="camera-header">
+              <div class="camera-title">
+                <span id="scannerStatusDot" class="status-dot"></span>
+                <span>連續自動對焦鏡頭</span>
+              </div>
+              <button onclick="switchCamera()" class="btn btn-secondary btn-sm">
+                🔄 切換前後鏡頭
+              </button>
+            </div>
+
+            <!-- 驗票方式提示區 (由 app.html 自動渲染，必須放在 #reader 外面，否則會被掃描器清空) -->
+            <div id="startCameraPrompt" class="camera-prompt-box">
+            </div>
+
+            <!-- 即時鏡頭畫面 container (只有允許即時相機時才會顯示) -->
+            <div id="reader" style="display: none;"></div>
+
+            <!-- 拍照核銷專用解碼元件 (隱藏) -->
+            <div id="fileScanReader" style="display: none;"></div>
+
+            <!-- 全螢幕/卡片狀態提示覆蓋層 (綠色成功 / 紅色失敗) -->
+            <div id="scanOverlay" class="scan-overlay">
+              <div id="overlayIcon" class="overlay-icon">✓</div>
+              <div id="overlayTitle" class="overlay-title">核銷成功！</div>
+              <div id="overlayDesc" class="overlay-desc">張小明 (校內) - 財金四</div>
+              <button id="overlayConfirmBtn" class="btn btn-overlay-confirm" onclick="confirmAndResumeScan()">
+                確認，繼續驗票 ➜
+              </button>
+            </div>
+          </div>
+
+          <!-- 側邊：手動輸入與近期檢票紀錄 (手機緊湊一屏優化) -->
+          <div class="scanner-side-panel">
+            <!-- 最新核銷成果快顯卡片 (移至鏡頭正下方，第一時間對照) -->
+            <div class="manual-entry-box last-result-box">
+              <div class="manual-title">
+                <span>📋</span> 上一筆驗票結果
+              </div>
+              <div id="lastResultCard" style="font-size: 0.9rem; color: var(--text-muted);">
+                尚無驗票紀錄
+              </div>
+            </div>
+
+            <!-- 手動輸入 Token 保底機制 (折疊抽屜設計，手機端預設收合省空間) -->
+            <details id="manualEntryDetails" class="manual-entry-box collapsible-entry">
+              <summary class="manual-title collapsible-summary">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <span>⌨️</span> 手動輸入票券 Token
+                </span>
+                <span class="collapse-icon">▾</span>
+              </summary>
+              <div class="collapsible-content">
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin: 6px 0 10px;">
+                  當 QR Code 污損或相機無法讀取時使用
+                </p>
+                <form onsubmit="handleManualVerify(event)">
+                  <div class="form-group" style="margin-bottom: 10px;">
+                    <input type="text" id="manualTokenInput" class="form-input" placeholder="例如: TKN-A1B2C3D4E5" required>
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="padding: 10px 16px;">
+                    手動核銷驗票
+                  </button>
+                </form>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+       * 頁籤 2: 觀眾狀態查詢 (Status Query Tab)
+       * ========================================== -->
+      <section id="tab-query" class="tab-pane">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <input type="text" id="queryKeywordInput" class="form-input" placeholder="搜尋姓名、學號、電話、Email 或 Token..."
+              onkeypress="handleQueryKeyPress(event)" oninput="toggleClearQueryBtn()">
+            <button id="clearQueryBtn" type="button" class="clear-input-btn" onclick="clearQueryInput()" style="display: none;">✕</button>
+          </div>
+          <button onclick="executeAttendeeQuery()" class="btn btn-primary search-btn">
+            🔍 查詢觀眾
+          </button>
+        </div>
+
+        <div id="queryResultsCount" style="display: none; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; padding: 0 4px;">
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>身分分類</th>
+                <th>姓名</th>
+                <th>班級/票種詳情</th>
+                <th>連絡電話</th>
+                <th>入場狀態</th>
+                <th>入場時間 (UTC+8)</th>
+                <th style="text-align: center;">快速操作</th>
+              </tr>
+            </thead>
+            <tbody id="queryResultTableBody">
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                  請在上方輸入關鍵字後進行查詢
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==========================================
+       * 頁籤 3: 實時統計看板 (Stats Dashboard Tab)
+       * ========================================== -->
+      <section id="tab-stats" class="tab-pane">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px;">
+          <h2 style="font-size: 1.25rem; font-weight: 700;">入場數據實時統計看板</h2>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button id="refreshStatsBtn" onclick="fetchStats(true)" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+              🔄 重新整理
+            </button>
+            <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+              <span id="statsPollingDot" class="status-dot paused"></span>
+              <span id="statsPollingNoticeText">手動更新模式</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 四大數據指標 -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">總報名人數</div>
+            <div id="statTotalRegistered" class="stat-value">0</div>
+            <div class="stat-desc">依姓名欄位加總 (全票種累計)</div>
+          </div>
+
+          <div class="stat-card accent-green">
+            <div class="stat-label">已入場人數</div>
+            <div id="statTotalCheckedIn" class="stat-value" style="color: var(--success);">0</div>
+            <div class="stat-desc">成功核銷總數</div>
+          </div>
+
+          <div class="stat-card accent-pink">
+            <div class="stat-label">未入場人數</div>
+            <div id="statTotalNotCheckedIn" class="stat-value" style="color: var(--accent-pink);">0</div>
+            <div class="stat-desc">等待入場中</div>
+          </div>
+
+          <div class="stat-card accent-cyan">
+            <div class="stat-label">整體入場率</div>
+            <div id="statAttendanceRate" class="stat-value" style="color: var(--accent-cyan);">0%</div>
+            <div class="progress-bar-container">
+              <div id="statProgressBar" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 校內 / 校外 / 公關票 細分與動態歷史紀錄 -->
+        <div class="charts-row">
+          <div class="manual-entry-box">
+            <div class="manual-title">
+              <span>🏫</span> 票種分類統計
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px;">
+                  <span>校內學生回覆</span>
+                  <span id="campusStatCount">0 / 0 人</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div id="campusProgressBar" class="progress-bar-fill" style="width: 0%; background: var(--primary);">
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px;">
+                  <span>校外觀眾回覆</span>
+                  <span id="offCampusStatCount">0 / 0 人</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div id="offCampusProgressBar" class="progress-bar-fill"
+                    style="width: 0%; background: var(--accent-pink);"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px;">
+                  <span>公關票</span>
+                  <span id="prStatCount">0 / 0 人</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div id="prProgressBar" class="progress-bar-fill"
+                    style="width: 0%; background: #f59e0b;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="manual-entry-box">
+            <div class="manual-title">
+              <span>⚡</span> 最新實時核銷動態
+            </div>
+            <ul id="recentLogsList" class="recent-logs-list">
+              <li style="color: var(--text-muted); text-align: center; padding: 20px;">尚無核銷動態</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+       * 頁籤 4: 白名單管理 (Admin Only)
+       * ========================================== -->
+      <section id="tab-whitelist" class="tab-pane">
+        <div
+          style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px;">
+          <h2 style="font-size: 1.25rem; font-weight: 700;">系統登入白名單管理 (CRUD)</h2>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="triggerBackfillTokens()" class="btn btn-secondary btn-sm">
+              ⚡ 補產生缺漏 Token 與 QR CODE 圖片
+            </button>
+            <button onclick="openAddUserModal()" class="btn btn-primary btn-sm">
+              ➕ 新增系統使用者
+            </button>
+          </div>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>電子郵件 (Email)</th>
+                <th>使用者姓名</th>
+                <th>身分別權限</th>
+                <th>管理操作</th>
+              </tr>
+            </thead>
+            <tbody id="whitelistTableBody">
+              <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                  載入白名單中...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================
+   * 模態對話框: 新增/編輯白名單使用者 Modal
+   * ========================================== -->
+  <div id="userModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="userModalTitle" class="modal-title">新增系統使用者</h3>
+        <button onclick="closeUserModal()" class="close-btn">&times;</button>
+      </div>
+      <form onsubmit="handleSaveUser(event)">
+        <input type="hidden" id="editOriginalEmail">
+
+        <div class="form-group">
+          <label class="form-label" for="modalEmail">電子郵件 (Email)</label>
+          <input type="email" id="modalEmail" class="form-input" required placeholder="user@domain.com">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modalName">使用者姓名</label>
+          <input type="text" id="modalName" class="form-input" required placeholder="例如: 王小明">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modalRole">身分別 (系統權限)</label>
+          <select id="modalRole" class="form-input" style="background: rgba(15, 23, 42, 0.9);">
+            <option value="檢票人員">檢票人員 (驗票/查詢/看板)</option>
+            <option value="管理者">管理者 (全權限 + CRUD + 補 Token)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <button type="button" onclick="closeUserModal()" class="btn btn-secondary">取消</button>
+          <button type="submit" class="btn btn-primary">儲存資料</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 設定檔 (API 網址) 必須在主程式之前載入 -->
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>
