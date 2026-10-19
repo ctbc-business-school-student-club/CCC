@@ -11,6 +11,7 @@ const IS_LOCAL_MOCK = !API_URL; // 未設定 API 網址時使用假資料
 
 let currentUser = null;   // { email, name, role }
 let sessionToken = null;  // 後端登入後發給的憑證
+
 let html5Qrcode = null;   // 即時鏡頭掃描器
 let fileScanner = null;   // 拍照核銷專用解碼器
 let currentFacingMode = "environment"; // 預設使用手機後置鏡頭
