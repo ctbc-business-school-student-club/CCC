@@ -28,7 +28,7 @@ const mockDb = {
     { category: "校內", ticketType: "校內票", identifier: "學號：10954001 (財金四)", name: "陳大明", detail: "班級: 財金四", email: "student1@mail.edu.tw", phone: "0912345678", token: "TKN-CAMPUS001", status: "未入場", checkInTime: "-" },
     { category: "校內", ticketType: "校內票", identifier: "學號：11054002 (國企三)", name: "林小華", detail: "班級: 國企三", email: "student2@mail.edu.tw", phone: "0923456789", token: "TKN-CAMPUS002", status: "已入場", checkInTime: "2026-10-09 19:15:20" },
     { category: "校外", ticketType: "校外票", identifier: "身分證後5碼：***12345", name: "張美玲", detail: "性別: 女 | 票種: 單人預售票", email: "guest1@gmail.com", phone: "0934567890", token: "TKN-OFFSITE001", status: "未入場", checkInTime: "-" },
-    { category: "校外", ticketType: "公關票", identifier: "身分證後5碼：***99887", name: "王貴賓", detail: "性別: 男 | 票種: 貴賓公關票", email: "vip@example.com", phone: "0988776655", token: "TKN-VIP001", status: "未入場", checkInTime: "-" }
+    { category: "公關票", ticketType: "公關票", identifier: "身分證後5碼：***99887", name: "王貴賓", detail: "性別: 男 | 票種: 貴賓公關票", email: "vip@example.com", phone: "0988776655", token: "TKN-VIP001", status: "未入場", checkInTime: "-" }
   ]
 };
 
@@ -248,11 +248,12 @@ async function initScanner() {
       { facingMode: currentFacingMode },
       {
         fps: 15, // 提高幀率，使掃描反應更敏捷
+        aspectRatio: 1.0, // 修正相機畫面與掃描取景框參數為 1:1 正方形
         // 動態計算完美正方形掃描框 (寬高嚴格相等)
         qrbox: (viewfinderWidth, viewfinderHeight) => {
           const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          // 取相機畫面短邊的 70%，限制在 180px ~ 280px 之間，確保是標準正方形
-          const edge = Math.max(180, Math.min(Math.floor(minEdge * 0.7), 280));
+          // 在 1:1 正方形畫面中取 72%，確保手機畫面中是置中且寬高嚴格相等的正方形
+          const edge = Math.max(180, Math.min(Math.floor(minEdge * 0.72), 280));
           return { width: edge, height: edge };
         },
         experimentalFeatures: {
@@ -702,17 +703,32 @@ async function fetchStats(isManual = false) {
     const offCampusRate = d.offCampus.registered > 0 ? (d.offCampus.checkedIn / d.offCampus.registered) * 100 : 0;
     document.getElementById("offCampusProgressBar").style.width = offCampusRate + "%";
 
+    if (d.pr) {
+      const prStatCount = document.getElementById("prStatCount");
+      const prProgressBar = document.getElementById("prProgressBar");
+      if (prStatCount) prStatCount.innerText = `${d.pr.checkedIn} / ${d.pr.registered} 人`;
+      if (prProgressBar) {
+        const prRate = d.pr.registered > 0 ? (d.pr.checkedIn / d.pr.registered) * 100 : 0;
+        prProgressBar.style.width = prRate + "%";
+      }
+    }
+
     const logsList = document.getElementById("recentLogsList");
     if (d.recentLogs && d.recentLogs.length > 0) {
-      logsList.innerHTML = d.recentLogs.map(log => `
+      logsList.innerHTML = d.recentLogs.map(log => {
+        let badgeCls = "role-staff";
+        if (log.category === "校內") badgeCls = "role-admin";
+        else if (log.category === "公關票" || (log.category && log.category.includes("公關"))) badgeCls = "role-vip";
+        return `
         <li class="log-item">
           <div>
             <span style="font-weight: 700;">${escapeHtml(log.name)}</span>
-            <span class="role-badge ${log.category === "校內" ? "role-admin" : "role-staff"}" style="font-size: 0.65rem; margin-left: 6px;">${escapeHtml(log.category)}</span>
+            <span class="role-badge ${badgeCls}" style="font-size: 0.65rem; margin-left: 6px;">${escapeHtml(log.category)}</span>
           </div>
           <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(log.time)} 核銷</div>
         </li>
-      `).join("");
+      `;
+      }).join("");
     } else {
       logsList.innerHTML = `<li style="color: var(--text-muted); text-align: center; padding: 20px;">尚無最新核銷紀錄</li>`;
     }
@@ -876,19 +892,32 @@ function handleMockApi(action, args) {
   }
 
   if (action === "getStats") {
-    const total = mockDb.attendees.length;
-    const checkedIn = mockDb.attendees.filter(a => a.status === "已入場");
-    const count = (cat, onlyIn) => mockDb.attendees.filter(a => a.category === cat && (!onlyIn || a.status === "已入場")).length;
+    // 依據「姓名」欄位非空來加總統計有效報名人數
+    const validAttendees = mockDb.attendees.filter(a => a.name && a.name.trim() !== "");
+    const total = validAttendees.length;
+    const checkedIn = validAttendees.filter(a => a.status === "已入場");
+    const count = (cat, onlyIn) => validAttendees.filter(a => {
+      const isMatch = cat === "公關票"
+        ? (a.category === "公關票" || a.ticketType === "公關票")
+        : (a.category === cat && a.ticketType !== "公關票");
+      return isMatch && (!onlyIn || a.status === "已入場");
+    }).length;
+
     return {
       success: true,
       data: {
         totalRegistered: total,
         totalCheckedIn: checkedIn.length,
         totalNotCheckedIn: total - checkedIn.length,
-        attendanceRate: Math.round((checkedIn.length / total) * 100),
+        attendanceRate: total > 0 ? Math.round((checkedIn.length / total) * 100) : 0,
         campus: { registered: count("校內"), checkedIn: count("校內", true), notCheckedIn: count("校內") - count("校內", true) },
         offCampus: { registered: count("校外"), checkedIn: count("校外", true), notCheckedIn: count("校外") - count("校外", true) },
-        recentLogs: checkedIn.map(a => ({ name: a.name, category: a.category, time: a.checkInTime }))
+        pr: { registered: count("公關票"), checkedIn: count("公關票", true), notCheckedIn: count("公關票") - count("公關票", true) },
+        recentLogs: checkedIn.map(a => ({
+          name: a.name,
+          category: (a.category === "公關票" || a.ticketType === "公關票") ? "公關票" : a.category,
+          time: a.checkInTime
+        }))
       }
     };
   }
