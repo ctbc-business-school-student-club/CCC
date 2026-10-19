@@ -948,3 +948,4 @@ function handleMockApi(action, args) {
 
   return { success: false, message: "未知指令" };
 }
+
