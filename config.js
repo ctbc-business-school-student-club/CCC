@@ -3,5 +3,5 @@
  * 若 API_URL 留空，系統會進入「本地測試模式」，使用假資料，方便在電腦上預覽畫面。
  */
 window.APP_CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbxUHXJVN9i9ZisO5InT3pThKSNj_C1FaQE5c5XoS2nDaAw2exO8dsWESRvGk5_D_xeXgg/exec"
+  API_URL: "https://script.google.com/macros/s/AKfycbzApGoqfOoKkIZHYzQR9M_ckMc8YI9qowVAMfrgkfxEP3Osjnzqhar0SoABclFllHfaZQ/exec"
 };
